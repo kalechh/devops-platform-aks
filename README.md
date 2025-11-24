@@ -50,91 +50,29 @@ The platform includes:
 ## 🧱 2. **Repository Structure**
 devops-platform-aks/
 │
-├── README.md
-│
 ├── architecture/
-│   ├── devops-architecture.png
-│   ├── aks-cluster-diagram.png
-│   ├── ai-integration-diagram.png
-│   └── network-policies-diagram.png
-│
 ├── terraform/
-│   ├── modules/
-│   │   ├── resource-group/
-│   │   ├── vnet/
-│   │   ├── aks/
-│   │   ├── acr/
-│   │   ├── dns/
-│   │   ├── ingress/
-│   │   ├── prometheus-grafana/
-│   │   ├── velero/
-│   │   ├── argocd/
-│   │   └── mysql/
-│   │
-│   └── environments/
-│       ├── dev/
-│       └── prod/
+│ ├── modules/
+│ └── environments/
 │
 ├── ci-cd/
-│   ├── jenkins/
-│   │   ├── Jenkinsfile
-│   │   └── screenshots/
-│   │       ├── pipeline.png
-│   │       └── stages.png
-│   │
-│   └── github-actions/
-│       └── build-and-deploy.yml
+│ ├── jenkins/
+│ └── github-actions/
 │
 ├── kubernetes/
-│   ├── deployments/
-│   │   ├── frontend.yaml
-│   │   ├── backend.yaml
-│   │   └── mysql.yaml
-│   │
-│   ├── services/
-│   │   ├── frontend-svc.yaml
-│   │   ├── backend-svc.yaml
-│   │   └── mysql-svc.yaml
-│   │
-│   ├── ingress/
-│   │   └── ingress.yaml
-│   │
-│   ├── network-policies/
-│   │   ├── default-deny.yaml
-│   │   ├── allow-frontend-backend.yaml
-│   │   ├── allow-backend-mysql.yaml
-│   │   └── allow-prometheus-backend.yaml
-│   │
-│   └── monitoring/
-│       ├── prometheus-values.yaml
-│       ├── grafana-values.yaml
-│       └── dashboards/
-│           └── cicd-dashboard.json
+│ ├── deployments/
+│ ├── services/
+│ ├── ingress/
+│ ├── network-policies/
+│ └── monitoring/
 │
 ├── ai-models/
-│   ├── anomaly-detection/
-│   │   ├── model/
-│   │   │   └── isolation_forest.pkl
-│   │   ├── app/
-│   │   │   ├── main.py
-│   │   │   ├── Dockerfile
-│   │   │   └── requirements.txt
-│   │   └── README.md
-│   │
-│   └── predictive-autoscaling/   (future folder)
+│ ├── anomaly-detection/
+│ └── predictive-autoscaling/ (future)
 │
 ├── app/
-│   ├── frontend-angular/
-│   └── backend-java/
-│       ├── src/
-│       └── Dockerfile
+│ ├── frontend-angular/
+│ └── backend-java/
 │
 └── docs/
-    ├── setup-guide.md
-    ├── aks-installation.md
-    ├── argocd-setup.md
-    ├── velero-backups.md
-    ├── monitoring-stack.md
-    ├── ai-integration.md
-    └── troubleshooting.md
 

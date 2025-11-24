@@ -147,6 +147,85 @@ Containerized and deployed on AKS.
 - Notify (email or Slack)
 
 Jenkins configuration is inside:
+ci-cd/jenkins/Jenkinsfile
 
 
+---
 
+## 🌀 8. **ArgoCD GitOps**
+
+- Automatic sync from GitHub repo to AKS  
+- Self-healing deployments  
+- Version-controlled manifests  
+- Auto-rollback on failure  
+
+Full setup in:
+
+docs/argocd-setup.md
+
+
+---
+
+Access the platform
+
+App: https://hamzakalech.com
+
+Grafana dashboard
+
+Prometheus metrics
+
+ArgoCD UI
+
+Jenkins UI
+
+## 📘 10. Documentation
+
+All setup steps are fully documented inside the docs/ folder:
+
+AKS installation
+
+Terraform modules
+
+Jenkins setup
+
+ArgoCD installation
+
+SSL configuration
+
+Network policies
+
+Monitoring
+
+AI model integration
+
+
+## 👤 11. Author
+
+Hamza Kalech
+Cloud & DevOps Engineer
+
+🌐 Portfolio: https://hamzakalech.com
+
+💼 LinkedIn: https://linkedin.com/in/hamzakalech
+
+📧 Email: kalechhamza1@gmail.com
+
+## ⭐ 12. Why This Project Matters
+
+This project demonstrates:
+
+Advanced DevOps automation
+
+Real Cloud Architecture
+
+Kubernetes production practices
+
+Network security with Zero Trust
+
+Infrastructure as Code
+
+Monitoring + Backups
+
+AI + DevOps integration (rare and high-value)
+
+This is a full enterprise-grade platform, deployable in real production environments.

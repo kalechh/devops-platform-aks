@@ -48,31 +48,105 @@ The platform includes:
 ---
 
 ## 🧱 2. **Repository Structure**
-devops-platform-aks/
-│
-├── architecture/
-├── terraform/
-│ ├── modules/
-│ └── environments/
-│
-├── ci-cd/
-│ ├── jenkins/
-│ └── github-actions/
-│
-├── kubernetes/
-│ ├── deployments/
-│ ├── services/
-│ ├── ingress/
-│ ├── network-policies/
-│ └── monitoring/
-│
-├── ai-models/
-│ ├── anomaly-detection/
-│ └── predictive-autoscaling/ (future)
-│
-├── app/
-│ ├── frontend-angular/
-│ └── backend-java/
-│
-└── docs/
+
+---
+
+## 🛠️ 3. **Tools & Technologies**
+
+### **Cloud & Infra**
+- Azure Kubernetes Service (AKS)
+- Azure Container Registry (ACR)
+- Azure DNS
+- Azure Storage Accounts
+- Terraform (modular design)
+- Calico Network Policies
+
+### **DevOps & Automation**
+- Jenkins (CI/CD)
+- GitHub Actions
+- ArgoCD (GitOps)
+- Docker
+- Helm
+
+### **Monitoring & Reliability**
+- Prometheus
+- Grafana (custom dashboards)
+- Velero backups
+
+### **Application**
+- Java 17 (Spring Boot)
+- Angular
+- FastAPI (AI microservice)
+- MySQL
+
+### **AI Integration**
+- Isolation Forest anomaly detection model  
+- Deployed and containerized with Docker  
+- Exposed via FastAPI  
+
+---
+
+## 🔐 4. **Security Features**
+
+This project implements **enterprise-grade Kubernetes security**, including:
+
+- Default **deny-all** network policy  
+- Specific allow policies:
+  - Frontend → Backend  
+  - Backend → MySQL  
+  - Prometheus → Backend  
+- HTTPS via Ingress + SSL  
+- Private ACR integration  
+- RBAC for Jenkins  
+- Cluster role separation  
+
+---
+
+## 📊 5. **Monitoring Setup**
+
+Prometheus and Grafana are installed using Helm.
+
+Features:
+
+- Cluster metrics  
+- Pod resource usage  
+- CI/CD performance dashboard  
+- AI model anomaly detection dashboard (future)
+
+Access examples:  
+- `https://prometheus.<your-domain>.com`  
+- `https://grafana.<your-domain>.com`
+
+---
+
+## 🤖 6. **AI-Powered Anomaly Detection**
+
+A microservice built with:
+
+- Python + FastAPI  
+- Isolation Forest model  
+- Trained on CI/CD pipeline metrics  
+- Predicts anomalies such as:
+  - Unexpected build failures  
+  - Long deployment times  
+  - High resource usage  
+  - Unusual patterns in Prometheus metrics  
+
+Containerized and deployed on AKS.
+
+---
+
+## 🔄 7. **CI/CD Pipelines**
+
+### **Jenkins Pipeline Stages**
+- Checkout  
+- Build & Test  
+- Static Code Analysis  
+- Docker Build & Push to ACR  
+- Deploy to AKS  
+- Notify (email or Slack)
+
+Jenkins configuration is inside:
+
+
 

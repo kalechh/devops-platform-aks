@@ -1,0 +1,30 @@
+=== DATA QUALITY REPORT ===
+
+Dataset Shape: (314, 47)
+Time Range: 2025-06-08 17:07:16 to 2025-06-08 19:43:46
+Duration: 0 days 02:36:30
+
+=== MISSING DATA ===
+up_metrics_rate_of_change: 1 (0.3%)
+up_metrics_rate_of_change_pct: 1 (0.3%)
+prometheus_build_info_rate_of_change: 1 (0.3%)
+prometheus_build_info_rate_of_change_pct: 1 (0.3%)
+node_load1_rate_of_change: 1 (0.3%)
+node_load1_rate_of_change_pct: 3 (1.0%)
+node_memory_available_rate_of_change: 1 (0.3%)
+node_memory_available_rate_of_change_pct: 1 (0.3%)
+container_cpu_all_rate_of_change: 1 (0.3%)
+container_cpu_all_rate_of_change_pct: 1 (0.3%)
+
+=== BASIC STATISTICS ===
+                           timestamp  ...  container_cpu_all_rate_of_change_pct
+count                            314  ...                            313.000000
+mean   2025-06-08 18:25:30.999999744  ...                              8.372200
+min              2025-06-08 17:07:16  ...                            -63.599367
+25%       2025-06-08 17:46:23.500000  ...                             -3.554946
+50%              2025-06-08 18:25:31  ...                             -0.497696
+75%       2025-06-08 19:04:38.500000  ...                              2.797549
+max              2025-06-08 19:43:46  ...                           2211.365879
+std                              NaN  ...                            126.801212
+
+[8 rows x 34 columns]

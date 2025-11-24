@@ -1,0 +1,28 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: jenkins-cluster-role
+rules:
+  # Permissions for persistentvolumes
+  - apiGroups: [""]
+    resources:
+      - persistentvolumes
+    verbs: ["get", "list", "watch", "create", "update", "delete", "patch"]
+
+  # Permissions for storageclasses
+  - apiGroups: ["storage.k8s.io"]
+    resources:
+      - storageclasses
+    verbs: ["get", "list", "watch", "create", "update", "delete", "patch"]
+
+  # Permissions for ClusterIssuer
+  - apiGroups: ["cert-manager.io"]
+    resources:
+      - clusterissuers
+    verbs: ["get", "list", "watch", "create", "update", "delete", "patch"]
+
+  # Permissions for VolumeSnapshotClasses
+  - apiGroups: ["snapshot.storage.k8s.io"]
+    resources:
+      - volumesnapshotclasses
+    verbs: ["get", "list", "watch", "create", "patch"]

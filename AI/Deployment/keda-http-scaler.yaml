@@ -1,0 +1,161 @@
+# KEDA ScaledObject that uses your model's predictions
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: ml-predictor-scaler
+  namespace: hamzadevops
+spec:
+  scaleTargetRef:
+    name: eventmanagement  # workload deployment name
+  minReplicaCount: 1
+  maxReplicaCount: 20
+  pollingInterval: 30  # Check every 30 seconds
+  cooldownPeriod: 300  # Wait 5 minutes before scaling down
+  triggers:
+  - type: metrics-api
+    metadata:
+      targetValue: "1"
+      url: "http://pod-predictor-service.hamzadevops.svc.cluster.local/keda-metric"
+      valueLocation: "metric_value"
+      method: "GET"
+#---
+# Alternative: Using external scaler for more control
+#apiVersion: keda.sh/v1alpha1
+#kind: ScaledObject
+#metadata:
+#  name: ml-predictor-external-scaler
+#  namespace: default
+#spec:
+#  scaleTargetRef:
+#    name: eventmanagement
+#  minReplicaCount: 1
+#  maxReplicaCount: 20
+#  triggers:
+#  - type: external
+#    metadata:
+#      scalerAddress: "pod-predictor-service.default.svc.cluster.local:80"
+#      metricName: "predicted_pods"
+#      targetValue: "1"
+---
+# ServiceMonitor to scrape metrics from your prediction service
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: pod-predictor-metrics
+  namespace: hamzadevops
+  labels:
+    app: pod-predictor
+spec:
+  selector:
+    matchLabels:
+      app: pod-predictor
+  endpoints:
+  - port: http
+    path: /prometheus-metrics
+    interval: 30s
+    scrapeTimeout: 10s
+---
+# ConfigMap with environment variables for your predictor
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pod-predictor-config
+  namespace: hamzadevops
+data:
+  PROMETHEUS_URL: "http://monitoring-kube-prometheus-prometheus.monitoring.svc.cluster.local:9090"
+  TARGET_NAMESPACE: "hamzadevops"
+  TARGET_DEPLOYMENT: "eventmanagement"  # workload name
+  MODEL_PATH: "/app/model/pod_predictor.pkl"
+  METADATA_PATH: "/app/model/model_metadata.json"
+  PORT: "8000"
+---
+# deployment with Prometheus integration
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pod-predictor
+  namespace: hamzadevops
+  labels:
+    app: pod-predictor
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: pod-predictor
+  template:
+    metadata:
+      labels:
+        app: pod-predictor
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+        prometheus.io/path: "/prometheus-metrics"
+    spec:
+      initContainers:
+        - name: copy-model
+          image: hamzakalech/pod-predictor:latest
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              cp /app/pod_predictor.pkl /model/ && \
+              cp /app/model_metadata.json /model/
+          volumeMounts:
+            - name: model-volume
+              mountPath: /model
+      containers:
+        - name: pod-predictor
+          image: hamzakalech/pod-predictor:latest
+          ports:
+            - containerPort: 8000
+              name: http
+          envFrom:
+            - configMapRef:
+                name: pod-predictor-config
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "250m"
+            limits:
+              memory: "1Gi"
+              cpu: "500m"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 2
+          volumeMounts:
+            - name: model-volume
+              mountPath: /app/model
+      volumes:
+        - name: model-volume
+          emptyDir: {}
+
+---
+# Service remains the same
+apiVersion: v1
+kind: Service
+metadata:
+  name: pod-predictor-service
+  namespace: hamzadevops
+  labels:
+    app: pod-predictor
+spec:
+  selector:
+    app: pod-predictor
+  ports:
+  - port: 80
+    targetPort: 8000
+    protocol: TCP
+    name: http
+  type: ClusterIP

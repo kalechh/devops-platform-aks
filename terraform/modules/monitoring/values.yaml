@@ -1,0 +1,39 @@
+alertmanager:
+  enabled: false
+
+grafana:
+  enabled: true
+  adminUser: kalech
+  adminPassword: grafana
+  service:
+    type: ClusterIP
+  ingress:
+    enabled: false
+  grafana.ini:
+    server:
+      root_url: "%(protocol)s://hamzakalech.chickenkiller.com/grafana/"
+      serve_from_sub_path: true
+
+prometheus:
+  prometheusSpec:
+    service:
+      type: ClusterIP
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: azure-disk-standard
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 3Gi
+    externalUrl: "https://hamzakalech.chickenkiller.com/prometheus"
+    routePrefix: /prometheus
+
+nodeExporter:
+  service:
+    type: ClusterIP
+
+kubeStateMetrics:
+  service:
+    type: ClusterIP

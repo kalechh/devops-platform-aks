@@ -1,0 +1,169 @@
+config:
+  target: "https://hamzakalech.com"     # ← your ingress host
+  processor: "./event-load-functions.js"
+
+  phases:
+    # ───────── Phase 1: Medium (30 min) ─────────
+    - duration: 1800      # 30 min
+      arrivalRate: 65
+      name: "🟡 Medium (1)"
+    # ───────── Phase 2: Light  (20 min) ─────────
+    - duration: 1200      # 20 min
+      arrivalRate: 5
+      name: "🟢 Light (1)"
+    # ───────── Phase 3: Heavy  (25 min) ─────────
+    - duration: 1500       # 25 min
+      arrivalRate: 150
+      name: "🔴 Heavy"
+    # ───────── Phase 4: Medium (30 min) ─────────
+    - duration: 1800
+      arrivalRate: 65
+      name: "🟡 Medium (2)"
+    # ───────── Phase 5: Light  (15 min) ─────────
+    - duration: 900
+      arrivalRate: 5
+      name: "🟢 Light (2)"
+
+  http:
+    pool: 50
+    timeout: 30
+    keepAlive: false
+
+  tls:
+    rejectUnauthorized: false
+
+  plugins:
+    ensure:
+      p99: 5000
+      maxErrorRate: 5
+
+  variables:
+    scalingTargets:
+      - "3-5"   # Medium 1
+      - "1-2"   # Light 1
+      - "8-12"  # Heavy
+      - "3-5"   # Medium 2
+      - "1-2"   # Light 2
+
+scenarios:
+  # 🟠 Front-end (≈10 % traffic)
+  - name: "CPU Intensive Frontend"
+    weight: 10              # ↓ was 30
+    flow:
+      - function: initializeTest
+      - function: logPhaseInfo
+
+      # Rapid static/HTML requests
+      - loop:
+          - get:
+              url: "/"
+              headers:
+                User-Agent: "LoadTest-CPU-{{ $randomInt(1000, 9999) }}"
+                Cache-Control: "no-cache"
+          - think: 0.1
+          - get:
+              url: "/events"
+              headers:
+                Cache-Control: "no-cache"
+          - think: 0.1
+        count: "{{ $randomInt(3, 6) }}"
+
+      - function: cpuStressTest
+
+      - parallel:
+          - get: { url: "/main.js" }
+          - get: { url: "/styles.css" }
+          - get: { url: "/polyfills.js" }
+          - get: { url: "/runtime.js" }
+
+  # 🔥 Back-end API workout (≈80 % traffic)
+  - name: "High Pressure API"
+    weight: 80              # ↑ was 50
+    flow:
+      - function: initializeTest
+      - function: logPhaseInfo
+
+      # Warm-up health checks
+      - loop:
+          - get:
+              url: "/api/actuator/health"
+              headers:
+                Accept: "application/json"
+                Cache-Control: "no-cache"
+          - think: 0.05
+        count: 3
+
+      # List events
+      - get:
+          url: "/api/events?size=50"
+          headers:
+            Accept: "application/json"
+            X-Load-Test: "high-pressure"
+
+      # Bulk creations in parallel
+      - function: generateEventData
+      - parallel:
+          - post:
+              url: "/api/events"
+              headers: { Content-Type: "application/json" }
+              json:
+                description: "{{ eventDescription }}-P1"
+                date: "{{ eventDate }}"
+                Number_of_tickets: "{{ ticketNumber }}"
+                additional_notes: "{{ additionalNotes }}"
+                place: "{{ eventPlace }}"
+          - post:
+              url: "/api/events"
+              headers: { Content-Type: "application/json" }
+              json:
+                description: "{{ eventDescription }}-P2"
+                date: "{{ eventDate }}"
+                Number_of_tickets: "{{ $randomInt(100, 500) }}"
+                additional_notes: "Parallel creation stress"
+                place: "{{ eventPlace }}"
+
+      # Pagination & DB stress
+      - loop:
+          - get:
+              url: "/api/events?page={{ $randomInt(0, 10) }}&size=100"
+              headers:
+                Accept: "application/json"
+                X-Database-Stress: "true"
+          - think: 0.2
+          - function: memoryStressTest
+        count: "{{ $randomInt(2, 5) }}"
+
+  # 🟢 Memory/DB intensive (≈10 % traffic)
+  - name: "Memory Database Stress"
+    weight: 10              # ↔ was 20
+    flow:
+      - function: initializeTest
+      - function: logPhaseInfo
+      - function: memoryStressTest
+      - function: cpuStressTest
+
+      # Bulk insertions
+      - function: generateBulkEventData
+      - loop:
+          - post:
+              url: "/api/events"
+              headers:
+                Content-Type: "application/json"
+                X-Bulk-Memory-Test: "{{ $loopCount }}"
+              json:
+                description: "{{ bulkEventDescription }}-{{ $loopCount }}"
+                date: "{{ bulkEventDate }}"
+                Number_of_tickets: "{{ $randomInt(500, 1000) }}"
+                additional_notes: "Bulk memory stress test"
+                place: "{{ bulkEventPlace }}"
+          - function: cpuStressTest
+          - think: 0.3
+        count: "{{ $randomInt(4, 8) }}"
+
+      # Large concurrent queries
+      - parallel:
+          - get: { url: "/api/events?size=200" }
+          - get: { url: "/api/events?page=0&size=150" }
+          - get: { url: "/api/events?page=1&size=150" }
+
+      - function: memoryStressTest

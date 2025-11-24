@@ -1,0 +1,120 @@
+# Deny all ingress traffic by default
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: hamzadevops
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+---
+# Allow Ingress NGINX to access Angular and PiEvent
+apiVersion: crd.projectcalico.org/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-to-frontend-backend
+  namespace: hamzadevops
+spec:
+  selector: app in {"angular-app", "eventmanagement"}
+  types:
+    - Ingress
+  ingress:
+    - action: Allow
+      protocol: TCP
+      source:
+        namespaceSelector: "projectcalico.org/name == 'ingress-nginx'"
+      destination:
+        ports:
+          - 80
+          - 8083
+---
+# Allow PiEvent to access MySQL on port 3306
+apiVersion: crd.projectcalico.org/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-eventmanagement-to-mysql
+  namespace: hamzadevops
+spec:
+  selector: app == 'mysql'
+  types:
+    - Ingress
+  ingress:
+    - action: Allow
+      protocol: TCP
+      source:
+        selector: app == 'eventmanagement'
+      destination:
+        ports:
+          - 3306
+---
+# Allow Prometheus to scrape PiEvent metrics (on port 8083)
+apiVersion: crd.projectcalico.org/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-prometheus-to-eventmanagement
+  namespace: hamzadevops
+spec:
+  selector: app == 'eventmanagement'
+  types:
+    - Ingress
+  ingress:
+    - action: Allow
+      protocol: TCP
+      source:
+        selector: app == 'prometheus'
+      destination:
+        ports:
+          - 8083
+---
+# allow-acme-solver.yaml
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-acme-solver
+  namespace: hamzadevops
+spec:
+  podSelector:
+    matchLabels:
+      acme.cert-manager.io/http01-solver: "true"
+  ingress:
+    - {}
+  policyTypes:
+    - Ingress
+
+---
+apiVersion: crd.projectcalico.org/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-prometheus-and-keda-to-predictor
+  namespace: hamzadevops
+spec:
+  selector: app == 'pod-predictor'
+  types:
+    - Ingress
+  ingress:
+    - action: Allow
+      protocol: TCP
+      source:
+        namespaceSelector: "projectcalico.org/name in {'monitoring','keda'}"
+      destination:
+        ports:
+          - 8000        # predictor HTTP port
+
+---
+apiVersion: crd.projectcalico.org/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-egress-to-prometheus
+  namespace: hamzadevops
+spec:
+  selector: all()                 # every pod here
+  types:
+    - Egress
+  egress:
+    - action: Allow
+      protocol: TCP
+      destination:
+        namespaceSelector: "projectcalico.org/name == 'monitoring'"
+        selector: "app.kubernetes.io/name == 'prometheus'"
+        ports: [9090]

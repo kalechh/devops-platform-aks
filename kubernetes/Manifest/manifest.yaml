@@ -1,0 +1,284 @@
+---
+# Secrets for MySQL
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mysql-secret
+  namespace: hamzadevops
+type: Opaque
+data:
+  MYSQL_ROOT_PASSWORD: UEAkc1cwcmQxMjM=  # Base64 encoded "P@$sW0rd123"
+
+---
+# ConfigMap for MySQL
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mysql-config
+  namespace: hamzadevops
+data:
+  MYSQL_DATABASE: "eventdb"
+
+---
+# Storage Class for Azure Disk 
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: azure-disk-standard
+provisioner: disk.csi.azure.com
+parameters:
+  storageAccountType: Standard_LRS # More cost-effective than Premium_LRS
+  kind: Managed
+reclaimPolicy: Delete # Changed to Delete for cost savings (deletes PV when PVC is deleted)
+volumeBindingMode: WaitForFirstConsumer
+
+---
+# Persistent Volume Claim for MySQL
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mysql-pvc
+  namespace: hamzadevops
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: azure-disk-standard
+  resources:
+    requests:
+      storage: 5Gi
+
+---
+# VolumeSnapshotClass for Azure Disk CSI
+apiVersion: snapshot.storage.k8s.io/v1
+kind: VolumeSnapshotClass
+metadata:
+  name: csi-azuredisk-snap
+  annotations:
+    snapshot.storage.kubernetes.io/is-default-class: "true"
+driver: disk.csi.azure.com
+deletionPolicy: Delete
+
+---
+# MySQL Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mysql
+  namespace: hamzadevops
+spec:
+  selector:
+    matchLabels:
+      app: mysql
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: mysql
+    spec:
+      nodeSelector:
+        agentpool: worker
+      tolerations:
+        - key: "dedicated"
+          operator: "Equal"
+          value: "app"
+          effect: "NoSchedule"
+      containers:
+        - image: mysql:latest
+          name: mysql
+          resources:
+            requests:
+              memory: "500Mi" 
+              cpu: "250m"     
+            limits:
+              memory: "1Gi" 
+              cpu: "500m"     
+          env:
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-secret
+                  key: MYSQL_ROOT_PASSWORD
+            - name: MYSQL_DATABASE
+              valueFrom:
+                configMapKeyRef:
+                  name: mysql-config
+                  key: MYSQL_DATABASE
+          ports:
+            - containerPort: 3306
+              name: mysql
+          volumeMounts:
+            - mountPath: /var/lib/mysql
+              name: mysql-data
+          livenessProbe:
+            tcpSocket:
+              port: 3306
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            exec:
+              command: ["mysqladmin", "ping", "-h", "127.0.0.1"]
+            initialDelaySeconds: 30
+            periodSeconds: 10
+      volumes:
+        - name: mysql-data
+          persistentVolumeClaim:
+            claimName: mysql-pvc
+
+---
+# MySQL Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql-service
+  namespace: hamzadevops
+spec:
+  ports:
+    - port: 3306
+      targetPort: 3306
+  selector:
+    app: mysql
+
+---
+# PiEvent Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: eventmanagement
+  namespace: hamzadevops
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: eventmanagement
+  template:
+    metadata:
+      labels:
+        app: eventmanagement
+    spec:
+      nodeSelector:
+        agentpool: worker
+      tolerations:
+        - key: "dedicated"
+          operator: "Equal"
+          value: "app"
+          effect: "NoSchedule"
+      containers:
+        - name: eventmanagement
+          image: hamzakalech/event-management:v96
+          imagePullPolicy: Always
+          resources:
+            requests:
+              memory: "512Mi" 
+              cpu: "150m"     
+            limits:
+              memory: "1Gi" 
+              cpu: "250m"     
+          ports:
+            - containerPort: 8083
+          env:
+            - name: SPRING_DATASOURCE_URL
+              value: jdbc:mysql://mysql-service:3306/eventdb?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+            - name: SPRING_DATASOURCE_USERNAME
+              value: root
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-secret
+                  key: MYSQL_ROOT_PASSWORD
+          livenessProbe:
+            httpGet:
+              path: /api/actuator/health/liveness
+              port: 8083
+            initialDelaySeconds: 90
+            timeoutSeconds: 5
+            periodSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /api/actuator/health/readiness
+              port: 8083
+            initialDelaySeconds: 90
+            timeoutSeconds: 5
+            periodSeconds: 10
+            failureThreshold: 3
+
+---
+# PiEvent Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: eventmanagement-service
+  namespace: hamzadevops
+spec:
+  type: ClusterIP 
+  ports:
+    - port: 8083
+      targetPort: 8083
+  selector:
+    app: eventmanagement
+
+---
+# Angular Frontend Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: angular-app
+  namespace: hamzadevops
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: angular-app
+  template:
+    metadata:
+      labels:
+        app: angular-app
+    spec:
+      nodeSelector:
+        agentpool: worker
+      tolerations:
+        - key: "dedicated"
+          operator: "Equal"
+          value: "app"
+          effect: "NoSchedule"
+      containers:
+        - name: angular-app
+          image: hamzakalech/my-angular-app:3.0
+
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "150m"
+            limits:
+              memory: "500Mi"
+              cpu: "250m"
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 30
+            periodSeconds: 10
+
+---
+# Angular Frontend Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: angular-service
+  namespace: hamzadevops
+spec:
+  type: ClusterIP
+  ports:
+    - port: 80
+      targetPort: 80
+  selector:
+    app: angular-app

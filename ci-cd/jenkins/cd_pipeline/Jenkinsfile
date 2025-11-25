@@ -1,0 +1,102 @@
+pipeline {
+    agent any
+
+    stages {
+        stage('Git Checkout') {
+            steps {
+                echo 'Git Checkout'
+                git branch: 'main', credentialsId: 'Git-credential', url: 'https://github.com/hamzakalech/Devops_CD.git'
+            }
+        }
+        stage('Deployment') {
+            steps {
+                echo 'Deploying App to AKS'
+                withKubeConfig(caCertificate: '', clusterName: 'hamzaDevOps', contextName: '', credentialsId: 'k8s', namespace: 'hamzadevops', restrictKubeConfigAccess: false, serverUrl: 'https://hamzadevops-2vdcu8jj.hcp.eastus.azmk8s.io:443') {
+                        sh " kubectl apply -f Manifest/manifest.yaml -n hamzadevops"
+                        sh " kubectl apply -f Manifest/hpa.yaml"
+                        sh " kubectl apply -f Manifest/network-policies.yaml -n hamzadevops"
+                        sleep 20
+                        // Conditionally apply Ingress
+                        // Apply Ingress for hamzadevops
+                        script {
+                            def appIngressExists = sh(
+                                script: "kubectl get ingress app-ingress -n hamzadevops --ignore-not-found | grep app-ingress",
+                                returnStatus: true
+                            )
+                            if (appIngressExists != 0) {
+                                echo "App Ingress not found. Applying ingress-app.yaml"
+                                sh "kubectl apply -f Manifest/ingress-app.yaml -n hamzadevops"
+                            } else {
+                                echo "App Ingress already exists. Skipping apply."
+                            }
+                        }
+
+                        //Apply Ingress for monitoring namespace
+                        script {
+                            def monitoringIngressExists = sh(
+                                script: "kubectl get ingress monitoring-ingress -n monitoring --ignore-not-found | grep monitoring-ingress",
+                                returnStatus: true
+                            )
+                            if (monitoringIngressExists != 0) {
+                                echo "Monitoring Ingress not found. Applying ingress-monitoring.yaml"
+                                sh "kubectl apply -f Manifest/ingress-monitoring.yaml -n monitoring"
+                            } else {
+                                echo "Monitoring Ingress already exists. Skipping apply."
+                            }
+                        }
+
+                        sleep 20
+
+                        script {
+                            def ciExists = sh(
+                                script: "kubectl get clusterissuer letsencrypt-prod --ignore-not-found | grep letsencrypt-prod",
+                                returnStatus: true
+                                )
+                            if (ciExists != 0) {
+                                echo "ClusterIssuer not found. Applying ci.yaml"
+                                sh "kubectl apply -f Manifest/ci.yaml"
+                            } else {
+                                echo "ClusterIssuer already exists. Skipping apply."
+                            }
+                        }
+                        script {
+                            def backupScheduleExists = sh(
+                                script: "kubectl get schedule daily-backup -n velero --ignore-not-found | grep daily-backup",
+                                returnStatus: true
+                            )
+                            if (backupScheduleExists != 0) {
+                                echo "Velero backup schedule not found. Applying velero-schedule.yaml"
+                                sh "kubectl apply -f Manifest/backup-schedule.yaml -n velero"
+                            } else {
+                                echo "Velero backup schedule already exists. Skipping apply."
+                            }
+                        }
+
+
+                    }
+            }
+        }
+        stage('Deployment Verification') {
+            steps {
+                echo 'Deployment Verification'
+                withKubeConfig(caCertificate: '', clusterName: 'hamzaDevOps', contextName: '', credentialsId: 'k8s', namespace: 'hamzadevops', restrictKubeConfigAccess: false, serverUrl: 'https://hamzadevops-2vdcu8jj.hcp.eastus.azmk8s.io:443') {
+                        sh " kubectl get pods -n hamzadevops"
+                        sh " kubectl get svc -n hamzadevops"
+                        sh " kubectl get pv"
+                        sh " kubectl get ingress -n hamzadevops"
+                }
+            }
+        }
+        /*stage('Nodes & Workloads') {
+            steps {
+                echo 'Deployment Verification'
+                withKubeConfig(caCertificate: '', clusterName: 'hamzaDevOps', contextName: '', credentialsId: 'k8s', namespace: 'hamzadevops', restrictKubeConfigAccess: false, serverUrl: 'https://hamzadevops-jdr8wlqs.hcp.eastus.azmk8s.io:443') {
+                        echo " Node Usage (CPU & Memory)"
+                        sh " kubectl top nodes"
+                        echo " pod usage"
+                        sh " kubectl top pods -A"
+                }
+            }
+        }*/
+    }
+}

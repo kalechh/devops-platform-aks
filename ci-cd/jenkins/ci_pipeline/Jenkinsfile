@@ -1,0 +1,167 @@
+pipeline {
+    agent any
+    
+    environment {
+    IMAGE_TAG = "v${BUILD_NUMBER}"
+    }
+
+
+    stages {
+        stage('Checkout GIT') {
+            steps {
+                echo 'Fetching code from GIT:'
+                git branch: 'Hamza-branch', 
+                credentialsId: 'Git-credential', 
+                url: 'https://github.com/hamzakalech/Hamza_Devops.git'
+            }
+        }
+        stage('Maven clean') {
+            steps {
+                sh 'mvn clean'
+            }
+        }
+        stage('Maven Compile') {
+            steps {
+                sh 'mvn compile'
+            }
+        }
+        stage('JUNIT/MOCKITO') {
+            steps {
+                sh 'mvn test'
+            }
+        }
+        stage('Trivy FS Scan') {
+            steps {
+                sh 'trivy fs --format table -o fs-report.html .'
+            }
+        }
+        stage('SonarQube Analysis') {
+            steps {
+                echo 'Analyzing code with SonarQube...'
+                withSonarQubeEnv('SonarQube') {
+                    sh 'mvn sonar:sonar'
+                }
+            }
+        }
+        stage('Quality Gate Check') { 
+            steps { 
+                timeout(30) { 
+                    waitForQualityGate abortPipeline: true, credentialsId: 'Sonar-token' 
+                } 
+            } 
+        }
+        stage('Nexus') {
+            steps {
+                sh'mvn deploy -DskipTests'
+            }
+        }
+        stage('Image Build') {
+            steps {
+                echo 'Création Image : ';
+                sh 'docker build --platform linux/amd64 -t hamzakalech/event-management:$IMAGE_TAG .'
+            }
+        }
+        stage('Trivy Image Scan') {
+            steps {
+                sh 'trivy image --format table -o image-report.html hamzakalech/event-management:$IMAGE_TAG'
+            }
+        }
+        stage('Docker Publish') {
+            steps {
+                echo 'Push Image to dockerhub:';
+                script {
+                withDockerRegistry(credentialsId: 'docker-cred') {
+                        sh 'docker push hamzakalech/event-management:$IMAGE_TAG'
+                    }
+                }
+            }
+        }
+        stage('Update Kubernetes Manifest') {
+            steps {
+                script {
+                    echo 'Updating Kubernetes manifest file...'
+                    withCredentials([string(credentialsId: 'Git-token', variable: 'GITHUB_TOKEN')]) {
+                        sh '''
+                        if [ -d "Devops_CD/.git" ]; then
+                            cd Devops_CD
+                            git reset --hard HEAD
+                            git pull origin main
+                        else
+                            rm -rf Devops_CD
+                            # Clone the private repository using token authentication
+                            git clone https://$GITHUB_TOKEN@github.com/hamzakalech/Devops_CD.git
+                            cd Devops_CD
+                        fi
+
+                        # Update the image tag in the Kubernetes manifest file
+                        sed -i "s|hamzakalech/event-management:.*|hamzakalech/event-management:${IMAGE_TAG}|" Manifest/manifest.yaml
+                
+                        # Confirm changes
+                        echo "Updated manifest file contents:"
+                        cat Manifest/manifest.yaml
+
+                        # Commit and push the changes
+                        git config user.name "Jenkins"
+                        git config user.email "jenkins@example.com"
+                        git add Manifest/manifest.yaml
+                        git commit -m "Updated image tag to ${IMAGE_TAG}"
+                        git push origin main
+                        '''
+                    }
+                }
+            }
+        }
+        stage('Trigger CD Pipeline') {
+            steps {
+                script {
+                    withCredentials([string(credentialsId: 'JENKINS_API_TOKEN', variable: 'JENKINS_TOKEN')]) {
+                        def response = sh(script: '''
+                            curl -s -o /dev/null -w "%{http_code}" -X POST "http://192.168.163.9:8080/job/CD/build?token=trigger-cd" \
+                            --user "kalech:$JENKINS_TOKEN"
+                        ''', returnStdout: true).trim()
+
+                        if (response != "201") {
+                            error("Failed to trigger CD Pipeline! HTTP response code: ${response}")
+                        } else {
+                            echo "Successfully triggered CD Pipeline!"
+                        }
+                    }
+                }
+            }
+        }
+    }
+post {
+        always {
+            script {
+                def jobName = env.JOB_NAME
+                def buildNumber = env.BUILD_NUMBER
+                def pipelineStatus = currentBuild.result ?: 'UNKNOWN'
+                def bannerColor = pipelineStatus.toUpperCase() == 'SUCCESS' ? 'green' : 'red'
+
+                def body = """
+                <html>
+                <body>
+                <div style="border: 4px solid ${bannerColor}; padding: 10px;">
+                    <h2>${jobName} - Build ${buildNumber}</h2>
+                    <div style="background-color: ${bannerColor}; padding: 10px;">
+                        <h3 style="color: white;">Pipeline Status: ${pipelineStatus.toUpperCase()}</h3>
+                    </div>
+                    <p>Check the <a href="${env.BUILD_URL}">console output</a>.</p>
+                </div>
+                </body>
+                </html>
+                """
+
+                emailext (
+                    subject: "${jobName} - Build ${buildNumber} - ${pipelineStatus.toUpperCase()}",
+                    body: body,
+                    to: 'hamza.kalech@esprit.tn',
+                    from: 'kalechhamza238@gmail.com',
+                    replyTo: 'kalechhamza238@gmail.com',
+                    mimeType: 'text/html'
+                )
+
+            }
+        }
+    }
+}

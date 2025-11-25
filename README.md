@@ -23,6 +23,8 @@ This repository represents the full platform I built during my DevOps internship
 
 <img width="1536" height="1024" alt="impact" src="https://github.com/user-attachments/assets/2500cf64-61f8-482a-b36d-37b8a22ef419" />
 
+<img width="1536" height="1024" alt="ChatGPT Image Jul 20, 2025, 12_22_29 PM" src="https://github.com/user-attachments/assets/70a4bc4b-7a7d-4c2e-8a4c-a121bee1169e" />
+
 
 This DevOps platform is designed not only with modern cloud architecture and automation, but also with **real business value** in mind.  
 The following measurable benefits demonstrate how this system reduces cost, saves time, and increases operational efficiency.
